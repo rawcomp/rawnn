@@ -34,3 +34,18 @@ float r_mse_loss(const RNONNULL RMatrix *pred, const RNONNULL RMatrix *real)
 
     return result / (real->cols * real->rows);
 }
+
+float r_mae_loss(const RNONNULL RMatrix *pred, const RNONNULL RMatrix *real)
+{
+    float result = 0.0f;
+    for (size_t i = 0; i < real->rows; i++)
+    {
+        for (size_t j = 0; j < real->cols; j++)
+        {
+            float error = (real->data[RMatrixIDX(i, j, real->cols)] - pred->data[RMatrixIDX(i, j, pred->cols)]);
+            result += fabsf(error);
+        }
+    }
+
+    return result / (real->cols * real->rows);
+}

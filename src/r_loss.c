@@ -1,4 +1,4 @@
-include <rc/r_loss.h>
+#include <rc/r_loss.h>
 #include <rc/r_matrix.h>
 #include <rc/r_types.h>
 
@@ -21,19 +21,20 @@ float r_cross_entropy(const RNONNULL RMatrix *matrix, const RNONNULL RMatrix *sr
 
 float r_bin_cross_entropy(const RNONNULL RMatrix *pred, const RNONNULL RMatrix *real)
 {
-	float total = 0.0f;
-	
-	for(size_t i = 0; i < real->rows; i++)
-	{
-		for(size_t j = 0; j < real->cols; j++)
-		{
-			float currentReal = real->data[RMatrixIDX(i, j, real->cols)];
-			float currentPred = pred->data[RMatrixIDX(i, j, pred->cols)];
-			total += currentReal * log(currentPred + EPSILON) + (1.0f - currentReal) * log(1.0f - currentPred + EPSILON);			
-		}
-	}
+    float total = 0.0f;
 
-	return -total / (real->cols * real->rows);
+    for (size_t i = 0; i < real->rows; i++)
+    {
+        for (size_t j = 0; j < real->cols; j++)
+        {
+            float currentReal = real->data[RMatrixIDX(i, j, real->cols)];
+            float currentPred = pred->data[RMatrixIDX(i, j, pred->cols)];
+            total +=
+                currentReal * log(currentPred + EPSILON) + (1.0f - currentReal) * log(1.0f - currentPred + EPSILON);
+        }
+    }
+
+    return -total / (real->cols * real->rows);
 }
 
 float r_mse_loss(const RNONNULL RMatrix *pred, const RNONNULL RMatrix *real)

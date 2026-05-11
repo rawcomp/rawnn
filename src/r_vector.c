@@ -1,5 +1,5 @@
-#include <rc/r_types.h>
 #include <rc/r_matrix.h>
+#include <rc/r_types.h>
 #include <rc/r_vector.h>
 
 RVector *r_create_vector(size_t size)

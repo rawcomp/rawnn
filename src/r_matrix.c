@@ -1,5 +1,5 @@
-#include <rc/r_types.h>
 #include <rc/r_matrix.h>
+#include <rc/r_types.h>
 
 RMatrix *r_create_matrix(size_t rows, size_t cols)
 {
@@ -44,7 +44,8 @@ RMatrix *r_mat_transpose(const RNONNULL RMatrix *matrix)
     {
         for (size_t j = 0; j < matrix->cols; j++)
         {
-            transposed_matrix->data[RMatrixIDX(j, i, transposed_matrix->cols)] = matrix->data[RMatrixIDX(i, j, matrix->cols)];
+            transposed_matrix->data[RMatrixIDX(j, i, transposed_matrix->cols)] =
+                matrix->data[RMatrixIDX(i, j, matrix->cols)];
         }
     }
     return transposed_matrix;

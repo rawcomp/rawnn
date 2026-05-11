@@ -2,10 +2,7 @@
 
 int main(void)
 {
-    float batch_data[3][4] = {
-        {1.0, 2.0, 3.0, 2.5},
-        {2.0, 5.0, -1.0, 2.0},
-        {3.0, 1.0, 4.0, 0.5}};
+    float batch_data[3][4] = {{1.0, 2.0, 3.0, 2.5}, {2.0, 5.0, -1.0, 2.0}, {3.0, 1.0, 4.0, 0.5}};
 
     RMatrix *batch = r_create_matrix(3, 4);
     // printf("Matrix created\n");
@@ -23,10 +20,7 @@ int main(void)
     layer->biases = r_create_vector(3);
     // printf("Layer created\n");
 
-    float w_data[3][4] = {
-        {0.2, 0.8, -0.5, 1.0},
-        {0.5, -0.91, 0.26, -0.5},
-        {-0.26, -0.27, 0.17, 0.87}};
+    float w_data[3][4] = {{0.2, 0.8, -0.5, 1.0}, {0.5, -0.91, 0.26, -0.5}, {-0.26, -0.27, 0.17, 0.87}};
     float b_data[3] = {2.0, 3.0, 0.5};
 
     for (int i = 0; i < 3; i++)

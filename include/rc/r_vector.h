@@ -19,3 +19,5 @@ void r_add_bias(RNONNULL RVector *vector, float bias);
 
 // VEC AND MATRIX OPERATIONS
 RVector *r_mat_vec_mul(const RNONNULL RMatrix *matrix, const RNONNULL RVector *vector);
+
+#endif

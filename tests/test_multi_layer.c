@@ -1,86 +1,265 @@
+#include <assert.h>
+#include <math.h>
+#include <stdio.h>
+#include <string.h>
+
 #include <rc/rc.h>
+
+#define DEFAULT_ABS_TOL 1e-5f
+#define DEFAULT_REL_TOL 1e-5f
+
+static RMatrix *make_matrix(size_t rows, size_t cols, const float *values)
+{
+    RMatrix *matrix = r_create_matrix(rows, cols);
+    const size_t count = rows * cols;
+    if (count > 0 && values != NULL)
+    {
+        memcpy(matrix->data, values, sizeof(float) * count);
+    }
+    return matrix;
+}
+
+static void set_layer_weights(RLayerDense *layer, const float *values)
+{
+    const size_t count = layer->weights->rows * layer->weights->cols;
+    if (count > 0 && values != NULL)
+    {
+        memcpy(layer->weights->data, values, sizeof(float) * count);
+    }
+}
+
+static void set_layer_biases(RLayerDense *layer, const float *values)
+{
+    const size_t count = layer->biases->size;
+    if (count > 0 && values != NULL)
+    {
+        memcpy(layer->biases->data, values, sizeof(float) * count);
+    }
+}
+
+static void compute_dense_expected(const float *inputs, size_t batch, size_t n_inputs,
+                                   const float *weights, size_t n_neurons,
+                                   const float *biases, float *out)
+{
+    for (size_t i = 0; i < batch; i++)
+    {
+        for (size_t j = 0; j < n_neurons; j++)
+        {
+            float sum = 0.0f;
+            if (n_inputs > 0 && weights != NULL)
+            {
+                for (size_t k = 0; k < n_inputs; k++)
+                {
+                    const float x = inputs[(i * n_inputs) + k];
+                    const float w = weights[(j * n_inputs) + k];
+                    sum += x * w;
+                }
+            }
+            out[(i * n_neurons) + j] = sum + biases[j];
+        }
+    }
+}
+
+static void assert_float_close(float actual, float expected, float abs_tol, float rel_tol, const char *msg)
+{
+    const float diff = fabsf(actual - expected);
+    const float scale = fmaxf(fabsf(expected), 1.0f);
+    const float tol = fmaxf(abs_tol, rel_tol * scale);
+
+    if (diff > tol)
+    {
+        fprintf(stderr,
+                "ASSERT_FLOAT_CLOSE failed: %s (actual=%.8f expected=%.8f diff=%.8f tol=%.8f)\n",
+                msg, actual, expected, diff, tol);
+    }
+
+    assert(diff <= tol);
+}
+
+static void assert_matrix_close(const RMatrix *actual, const float *expected,
+                                size_t rows, size_t cols, float abs_tol, float rel_tol,
+                                const char *label)
+{
+    assert(actual != NULL && "matrix should not be NULL");
+    assert(actual->rows == rows && actual->cols == cols && "matrix dimensions mismatch");
+
+    for (size_t i = 0; i < rows; i++)
+    {
+        for (size_t j = 0; j < cols; j++)
+        {
+            const size_t idx = RMatrixIDX(i, j, cols);
+            char msg[128];
+            snprintf(msg, sizeof(msg), "%s r=%zu c=%zu", label, i, j);
+            assert_float_close(actual->data[idx], expected[idx], abs_tol, rel_tol, msg);
+        }
+    }
+}
+
+static void test_create_layer_dimensions(void)
+{
+    RLayerDense *layer = r_create_layer(3, 2);
+
+    assert(layer != NULL && "layer should be allocated");
+    assert(layer->weights != NULL && "weights should be allocated");
+    assert(layer->biases != NULL && "biases should be allocated");
+    assert(layer->weights->rows == 2 && layer->weights->cols == 3 && "weights dimensions");
+    assert(layer->biases->size == 2 && "biases dimensions");
+
+    r_free_layer(layer);
+}
+
+static void test_layer_forward_basic(void)
+{
+    const float input_vals[] = {1.0f, 2.0f, 3.0f,
+                                4.0f, 5.0f, 6.0f};
+    const float weight_vals[] = {0.2f, 0.4f, -0.5f,
+                                 1.0f, -1.0f, 0.5f};
+    const float bias_vals[] = {0.1f, -0.2f};
+
+    RMatrix *input = make_matrix(2, 3, input_vals);
+    RLayerDense *layer = r_create_layer(3, 2);
+    set_layer_weights(layer, weight_vals);
+    set_layer_biases(layer, bias_vals);
+
+    float expected[4];
+    compute_dense_expected(input_vals, 2, 3, weight_vals, 2, bias_vals, expected);
+
+    RMatrix *output = r_layer_forward(layer, input);
+
+    assert_matrix_close(output, expected, 2, 2, DEFAULT_ABS_TOL, DEFAULT_REL_TOL, "layer_forward_basic");
+
+    r_free_matrix(input);
+    r_free_matrix(output);
+    r_free_layer(layer);
+}
+
+static void test_layer_forward_bias_only_zero_inputs(void)
+{
+    const float bias_vals[] = {1.5f, -2.0f, 0.0f};
+
+    RMatrix *input = r_create_matrix(2, 0);
+    RLayerDense *layer = r_create_layer(0, 3);
+    set_layer_biases(layer, bias_vals);
+
+    float expected[6];
+    compute_dense_expected(NULL, 2, 0, NULL, 3, bias_vals, expected);
+
+    RMatrix *output = r_layer_forward(layer, input);
+
+    assert_matrix_close(output, expected, 2, 3, DEFAULT_ABS_TOL, DEFAULT_REL_TOL,
+                        "layer_forward_zero_inputs_bias_only");
+
+    r_free_matrix(input);
+    r_free_matrix(output);
+    r_free_layer(layer);
+}
+
+static void test_layer_forward_zero_batch_size(void)
+{
+    const float weight_vals[] = {0.1f, 0.2f, 0.3f,
+                                 -0.4f, 0.5f, -0.6f};
+    const float bias_vals[] = {0.7f, -0.8f};
+
+    RMatrix *input = r_create_matrix(0, 3);
+    RLayerDense *layer = r_create_layer(3, 2);
+    set_layer_weights(layer, weight_vals);
+    set_layer_biases(layer, bias_vals);
+
+    RMatrix *output = r_layer_forward(layer, input);
+
+    assert(output != NULL && "output should be allocated");
+    assert(output->rows == 0 && output->cols == 2 && "zero batch should keep cols");
+
+    r_free_matrix(input);
+    r_free_matrix(output);
+    r_free_layer(layer);
+}
+
+static void test_layer_forward_nan_propagation(void)
+{
+    const float input_vals[] = {NAN, 1.0f};
+    const float weight_vals[] = {0.5f, -1.0f};
+    const float bias_vals[] = {0.0f};
+
+    RMatrix *input = make_matrix(1, 2, input_vals);
+    RLayerDense *layer = r_create_layer(2, 1);
+    set_layer_weights(layer, weight_vals);
+    set_layer_biases(layer, bias_vals);
+
+    RMatrix *output = r_layer_forward(layer, input);
+
+    assert(isnan(output->data[0]) && "layer_forward should propagate NaN inputs");
+
+    r_free_matrix(input);
+    r_free_matrix(output);
+    r_free_layer(layer);
+}
+
+static void test_multi_layer_forward_matches_manual(void)
+{
+    const float input_vals[] = {1.0f, -1.0f,
+                                0.5f, 2.0f};
+
+    const float w1[] = {0.1f, 0.2f,
+                        -0.3f, 0.4f,
+                        0.5f, -0.6f};
+    const float b1[] = {0.01f, 0.02f, -0.03f};
+
+    const float w2[] = {0.7f, -0.8f, 0.9f,
+                        -1.0f, 0.5f, 0.3f};
+    const float b2[] = {0.1f, -0.2f};
+
+    const float w3[] = {0.25f, -0.75f};
+    const float b3[] = {0.05f};
+
+    float expected_l1[6];
+    float expected_l2[4];
+    float expected_l3[2];
+
+    compute_dense_expected(input_vals, 2, 2, w1, 3, b1, expected_l1);
+    compute_dense_expected(expected_l1, 2, 3, w2, 2, b2, expected_l2);
+    compute_dense_expected(expected_l2, 2, 2, w3, 1, b3, expected_l3);
+
+    RMatrix *input = make_matrix(2, 2, input_vals);
+
+    RLayerDense *l1 = r_create_layer(2, 3);
+    set_layer_weights(l1, w1);
+    set_layer_biases(l1, b1);
+
+    RLayerDense *l2 = r_create_layer(3, 2);
+    set_layer_weights(l2, w2);
+    set_layer_biases(l2, b2);
+
+    RLayerDense *l3 = r_create_layer(2, 1);
+    set_layer_weights(l3, w3);
+    set_layer_biases(l3, b3);
+
+    RMatrix *out1 = r_layer_forward(l1, input);
+    RMatrix *out2 = r_layer_forward(l2, out1);
+    RMatrix *out3 = r_layer_forward(l3, out2);
+
+    assert_matrix_close(out1, expected_l1, 2, 3, DEFAULT_ABS_TOL, DEFAULT_REL_TOL, "multi_layer_out1");
+    assert_matrix_close(out2, expected_l2, 2, 2, DEFAULT_ABS_TOL, DEFAULT_REL_TOL, "multi_layer_out2");
+    assert_matrix_close(out3, expected_l3, 2, 1, DEFAULT_ABS_TOL, DEFAULT_REL_TOL, "multi_layer_out3");
+
+    r_free_matrix(input);
+    r_free_matrix(out1);
+    r_free_matrix(out2);
+    r_free_matrix(out3);
+    r_free_layer(l1);
+    r_free_layer(l2);
+    r_free_layer(l3);
+}
 
 int main(void)
 {
-    RLayerDense *l1 = r_create_layer(5, 10);
+    test_create_layer_dimensions();
+    test_layer_forward_basic();
+    test_layer_forward_bias_only_zero_inputs();
+    test_layer_forward_zero_batch_size();
+    test_layer_forward_nan_propagation();
+    test_multi_layer_forward_matches_manual();
 
-    RLayerDense *l2 = r_create_layer(10, 5);
-
-    RLayerDense *l3 = r_create_layer(5, 2);
-
-    float batchl1[10][5] = {{3.45, 1.22, 4.87, 0.54, 2.11}, {4.01, 2.76, 1.99, 3.33, 0.15},
-                            {1.55, 4.44, 2.05, 3.81, 4.92}, {0.88, 1.12, 3.65, 2.45, 4.10},
-                            {2.99, 0.45, 1.76, 4.56, 3.12}, {1.23, 3.44, 4.89, 2.67, 0.91},
-                            {4.12, 2.34, 1.87, 3.55, 4.09}, {0.67, 1.98, 2.88, 4.76, 3.21},
-                            {3.34, 4.65, 0.23, 1.56, 2.78}, {2.45, 3.89, 4.12, 1.34, 0.76}};
-
-    float input[10][5] = {{1.87, 4.23, 3.11, 0.99, 2.45}, {4.65, 1.34, 2.87, 3.76, 0.45},
-                          {2.12, 3.98, 4.55, 1.23, 3.67}, {0.55, 2.44, 1.89, 4.12, 3.33},
-                          {3.78, 4.89, 0.67, 2.15, 1.45}, {4.34, 1.12, 2.56, 3.88, 4.91},
-                          {1.99, 3.45, 4.76, 0.23, 2.88}, {2.67, 4.12, 1.34, 3.55, 0.87},
-                          {3.89, 2.34, 4.45, 1.76, 2.11}, {0.45, 1.88, 3.67, 4.23, 2.99}};
-
-    float biasesl1[10] = {1.25, 6.33, 4.12, 0.89, 5.55, 2.76, 3.91, 6.98, 1.05, 4.44};
-
-    float biasesl2[5] = {3.14, 5.82, 0.45, 6.71, 2.39};
-
-    float biasesl3[2] = {0.50, -0.50};
-
-    for (size_t i = 0; i < l1->biases->size; i++)
-    {
-        l1->biases->data[i] = biasesl1[i];
-    }
-    for (size_t i = 0; i < l2->biases->size; i++)
-    {
-        l2->biases->data[i] = biasesl2[i];
-    }
-
-    for (size_t i = 0; i < l3->biases->size; i++)
-    {
-        l3->biases->data[i] = biasesl3[i];
-    }
-
-    for (size_t i = 0; i < l1->weights->rows; i++)
-    {
-        for (size_t j = 0; j < l1->weights->cols; j++)
-        {
-            l1->weights->data[RMatrixIDX(i, j, l1->weights->cols)] = batchl1[j][i];
-        }
-    }
-
-    for (size_t i = 0; i < l2->weights->rows; i++)
-    {
-        for (size_t j = 0; j < l2->weights->cols; j++)
-        {
-            l2->weights->data[RMatrixIDX(i, j, l2->weights->cols)] = 0.1f * (i + j + 1);
-        }
-    }
-
-    for (size_t i = 0; i < l3->weights->rows; i++)
-    {
-        for (size_t j = 0; j < l3->weights->cols; j++)
-        {
-            l3->weights->data[RMatrixIDX(i, j, l3->weights->cols)] = 0.2f * (i + 1) - 0.1f * j;
-        }
-    }
-
-    RMatrix *input_matrix = r_create_matrix(10, 5);
-    for (size_t i = 0; i < input_matrix->rows; i++)
-    {
-        for (size_t j = 0; j < input_matrix->cols; j++)
-        {
-            input_matrix->data[RMatrixIDX(i, j, input_matrix->cols)] = input[i][j];
-        }
-    }
-
-    RMatrix *output_l1 = r_layer_forward(l1, input_matrix);
-    r_print_matrix(output_l1, "OUTPUT FIRST LAYER");
-
-    RMatrix *output_l2 = r_layer_forward(l2, output_l1);
-    r_print_matrix(output_l2, "OUTPUT SECOND LAYER");
-
-    RMatrix *output_l3 = r_layer_forward(l3, output_l2);
-    r_print_matrix(output_l3, "OUTPUT THIRD LAYER");
-
+    printf("All multi-layer tests passed.\n");
     return 0;
 }

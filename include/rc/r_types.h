@@ -23,6 +23,7 @@
 #define RNULLABLE
 
 #define RMatrixIDX(i, j, cols) ((i) * (cols) + (j))
+#define MatrixSize(matrix) ((matrix->rows) * (matrix->cols))
 
 #define EPSILON 1e-7f
 

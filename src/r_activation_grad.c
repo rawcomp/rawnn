@@ -1,56 +1,85 @@
 #include <rc/r_activation_grad.h>
 
+/**
+ * r_activation_relu_grad() - Compute ReLU gradient.
+ * @input: Input matrix from the forward pass.
+ * @upstream_grad: Gradient flowing from the next layer.
+ * @grad: Output gradient matrix to fill.
+ *
+ * Writes the element-wise gradient into @grad by masking negative inputs
+ * and scaling by @upstream_grad.
+ * Return: Nothing.
+ */
 void r_activation_relu_grad(const RNONNULL RMatrix *input, const RNONNULL RMatrix *upstream_grad,
                             RNONNULL RMatrix *grad)
 {
-    for (size_t i = 0; i < input->rows; i++)
+    const size_t count = MatrixSize(input);
+    for (size_t i = 0; i < count; i++)
     {
-        for (size_t j = 0; j < input->cols; j++)
-        {
-            size_t index = RMatrixIDX(i, j, input->cols);
-            grad->data[index] = (input->data[index] > 0) ? upstream_grad->data[index] : 0;
-        }
+        grad->data[i] = (input->data[i] > 0.0f) ? upstream_grad->data[i] : 0.0f;
     }
 }
 
+/**
+ * r_activation_leaky_relu_grad() - Compute leaky ReLU gradient.
+ * @input: Input matrix from the forward pass.
+ * @upstream_grad: Gradient flowing from the next layer.
+ * @alpha: Slope used for negative values.
+ * @grad: Output gradient matrix to fill.
+ *
+ * Writes the element-wise gradient into @grad, scaling negative inputs by
+ * @alpha while passing positive gradients through unchanged.
+ * Return: Nothing.
+ */
 void r_activation_leaky_relu_grad(const RNONNULL RMatrix *input, const RNONNULL RMatrix *upstream_grad, float alpha,
                                   RNONNULL RMatrix *grad)
 {
-    for (size_t i = 0; i < input->rows; i++)
+    const size_t count = MatrixSize(input);
+    for (size_t i = 0; i < count; i++)
     {
-        for (size_t j = 0; j < input->cols; j++)
-        {
-            size_t index = RMatrixIDX(i, j, input->cols);
-            grad->data[index] =
-                (input->data[index] > 0) ? upstream_grad->data[index] : upstream_grad->data[index] * alpha;
-        }
+        grad->data[i] = (input->data[i] > 0.0f) ? upstream_grad->data[i] : upstream_grad->data[i] * alpha;
     }
 }
 
+/**
+ * r_activation_gelu_grad() - Compute GELU gradient.
+ * @input: Input matrix from the forward pass.
+ * @upstream_grad: Gradient flowing from the next layer.
+ * @grad: Output gradient matrix to fill.
+ *
+ * Computes the GELU derivative using the normal CDF and PDF, then scales
+ * by @upstream_grad into @grad.
+ * Return: Nothing.
+ */
 void r_activation_gelu_grad(const RNONNULL RMatrix *input, const RNONNULL RMatrix *upstream_grad,
                             RNONNULL RMatrix *grad)
 {
     float bsqrt2 = 1 / M_SQRT2;
     float inv_sqrt_2pi = 1.0f / sqrtf(2.0f * M_PI);
-
-    for (size_t i = 0; i < input->rows; i++)
+    const size_t count = MatrixSize(input);
+    for (size_t i = 0; i < count; i++)
     {
-        for (size_t j = 0; j < input->cols; j++)
-        {
-            size_t index = RMatrixIDX(i, j, input->cols);
+        float val = input->data[i];
 
-            float val = input->data[index];
+        float cdf = 0.5f * (1.0f + erff(val * bsqrt2));
+        float pdf = inv_sqrt_2pi * expf(-0.5f * val * val);
 
-            float cdf = 0.5 * (1 + erff(val * bsqrt2));
-            float pdf = inv_sqrt_2pi * expf(-0.5f * val * val);
+        float local_grad = cdf + (val * pdf);
 
-            float local_grad = cdf + (val * pdf);
-
-            grad->data[index] = local_grad * upstream_grad->data[index];
-        }
+        grad->data[i] = local_grad * upstream_grad->data[i];
     }
 }
 
+/**
+ * r_activation_softmax_grad() - Compute softmax gradient.
+ * @output: Softmax output from the forward pass.
+ * @upstream_grad: Gradient flowing from the next layer.
+ * @grad: Output gradient matrix to fill.
+ *
+ * Computes the Jacobian-vector product for softmax per row using
+ * @output and @upstream_grad, writing the result to @grad.
+ * Return: Nothing.
+ */
 void r_activation_softmax_grad(const RNONNULL RMatrix *output, const RNONNULL RMatrix *upstream_grad,
                                RNONNULL RMatrix *grad)
 {
@@ -71,19 +100,26 @@ void r_activation_softmax_grad(const RNONNULL RMatrix *output, const RNONNULL RM
     }
 }
 
+/**
+ * r_activation_swish_grad() - Compute swish gradient.
+ * @input: Input matrix from the forward pass.
+ * @upstream_grad: Gradient flowing from the next layer.
+ * @grad: Output gradient matrix to fill.
+ *
+ * Computes the swish derivative using the sigmoid term and writes the
+ * scaled gradient into @grad.
+ * Return: Nothing.
+ */
 void r_activation_swish_grad(const RNONNULL RMatrix *input, const RNONNULL RMatrix *upstream_grad,
                              RNONNULL RMatrix *grad)
 {
-    for (size_t i = 0; i < input->rows; i++)
+    const size_t count = MatrixSize(input);
+    for (size_t i = 0; i < count; i++)
     {
-        for (size_t j = 0; j < input->cols; j++)
-        {
-            size_t index = RMatrixIDX(i, j, input->cols);
-            float val = input->data[index];
-            float sigmoid = 1.0f / (1.0f + expf(-val));
-            float local_grad = sigmoid + val * sigmoid * (1.0f - sigmoid);
+        float val = input->data[i];
+        float sigmoid = 1.0f / (1.0f + expf(-val));
+        float local_grad = sigmoid + val * sigmoid * (1.0f - sigmoid);
 
-            grad->data[index] = upstream_grad->data[index] * local_grad;
-        }
+        grad->data[i] = upstream_grad->data[i] * local_grad;
     }
 }

@@ -3,6 +3,12 @@
 
 #include <rc/r_types.h>
 
+/**
+ * struct r_matrix_t - Simple row-major matrix container.
+ * @data: Contiguous data buffer of size @rows * @cols.
+ * @rows: Number of rows.
+ * @cols: Number of columns.
+ */
 typedef struct r_matrix_t
 {
     float *data;
@@ -10,7 +16,6 @@ typedef struct r_matrix_t
     size_t cols;
 } RMatrix;
 
-// MATRIX OPERATIONS
 RMatrix *r_create_matrix(size_t rows, size_t cols);
 void r_free_matrix(RNONNULL RMatrix *matrix);
 RMatrix *r_mat_mul(const RNONNULL RMatrix *mat1, const RNONNULL RMatrix *mat2);

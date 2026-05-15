@@ -5,6 +5,11 @@
 #include <rc/r_matrix.h>
 #include <rc/r_vector.h>
 
+/**
+ * struct r_layer_dense_t - Parameters for a dense layer.
+ * @weights: Weight matrix of shape (n_neurons, n_inputs).
+ * @biases: Bias vector of length n_neurons.
+ */
 typedef struct r_layer_dense_t
 {
     RMatrix *weights;

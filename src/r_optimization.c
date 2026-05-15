@@ -2,7 +2,8 @@
 
 void r_optimization_sgd(RNONNULL RMatrix *theta, const RNONNULL RMatrix *grad, float eta)
 {
-    for (size_t i = 0; i < MatrixSize(theta); i++)
+    const size_t count = MatrixSize(theta);
+    for (size_t i = 0; i < count; i++)
     {
         theta->data[i] -= eta * grad->data[i];
     }
@@ -11,7 +12,8 @@ void r_optimization_sgd(RNONNULL RMatrix *theta, const RNONNULL RMatrix *grad, f
 void r_optimization_sgdm(RNONNULL RMatrix *theta, const RNONNULL RMatrix *grad, RNONNULL RMatrix *velocity, float eta,
                          float beta)
 {
-    for (size_t i = 0; i < MatrixSize(theta); i++)
+    const size_t count = MatrixSize(theta);
+    for (size_t i = 0; i < count; i++)
     {
         velocity->data[i] = beta * velocity->data[i] + (1.0f - beta) * grad->data[i];
         theta->data[i] -= eta * velocity->data[i];
@@ -21,7 +23,8 @@ void r_optimization_sgdm(RNONNULL RMatrix *theta, const RNONNULL RMatrix *grad, 
 void r_optimization_rmsprop(RNONNULL RMatrix *theta, const RNONNULL RMatrix *grad, RNONNULL RMatrix *cache, float eta,
                             float rho, float eps)
 {
-    for (size_t i = 0; i < MatrixSize(theta); i++)
+    const size_t count = MatrixSize(theta);
+    for (size_t i = 0; i < count; i++)
     {
         float g = grad->data[i];
         cache->data[i] = rho * cache->data[i] + (1.0f - rho) * (g * g);
@@ -35,7 +38,8 @@ void r_optimization_adam(RNONNULL RMatrix *theta, const RNONNULL RMatrix *grad, 
     float beta1_t = 1.0f - powf(beta1, (float)t);
     float beta2_t = 1.0f - powf(beta2, (float)t);
 
-    for (size_t i = 0; i < MatrixSize(theta); i++)
+    const size_t count = MatrixSize(theta);
+    for (size_t i = 0; i < count; i++)
     {
         float g = grad->data[i];
 

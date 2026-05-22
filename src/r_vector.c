@@ -11,9 +11,23 @@
 RVector *r_create_vector(size_t size)
 {
     RVector *vector = malloc(sizeof(RVector));
+    if (!vector)
+        return NULL;
 
     vector->size = size;
-    vector->data = malloc(sizeof(float) * vector->size);
+
+    if (size == 0)
+    {
+        vector->data = NULL;
+        return vector;
+    }
+
+    vector->data = malloc(sizeof(float) * size);
+    if (!vector->data)
+    {
+        free(vector);
+        return NULL;
+    }
 
     return vector;
 }
@@ -28,6 +42,8 @@ RVector *r_create_vector(size_t size)
  */
 void r_free_vector(RNONNULL RVector *vector)
 {
+    if (!vector)
+        return;
     free(vector->data);
     vector->size = 0;
     free(vector);
@@ -50,16 +66,17 @@ RVector *r_mat_vec_mul(const RNONNULL RMatrix *matrix, const RNONNULL RVector *v
         return NULL;
     }
 
-    RVector *result = malloc(sizeof(RVector));
-    result->size = matrix->rows;
-    result->data = malloc(sizeof(float) * result->size);
+    RVector *result = r_create_vector(matrix->rows);
+    if (!result)
+        return NULL;
 
     for (size_t i = 0; i < matrix->rows; i++)
     {
         float sum = 0.0f;
+        const float *row = &matrix->data[i * matrix->cols];
         for (size_t j = 0; j < matrix->cols; j++)
         {
-            sum += matrix->data[RMatrixIDX(i, j, matrix->cols)] * vector->data[j];
+            sum += row[j] * vector->data[j];
         }
         result->data[i] = sum;
     }

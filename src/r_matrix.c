@@ -12,10 +12,33 @@
 RMatrix *r_create_matrix(size_t rows, size_t cols)
 {
     RMatrix *matrix = malloc(sizeof(RMatrix));
+    if (!matrix)
+        return NULL;
 
     matrix->rows = rows;
     matrix->cols = cols;
-    matrix->data = malloc(sizeof(float) * matrix->rows * matrix->cols);
+
+    size_t total_elements = rows * cols;
+
+    if (total_elements == 0)
+    {
+        matrix->data = NULL;
+        return matrix;
+    }
+
+    // Check for overflow before allocation
+    if (rows != 0 && total_elements / rows != cols)
+    {
+        free(matrix);
+        return NULL;
+    }
+
+    matrix->data = malloc(sizeof(float) * total_elements);
+    if (!matrix->data)
+    {
+        free(matrix);
+        return NULL;
+    }
 
     return matrix;
 }
@@ -30,6 +53,8 @@ RMatrix *r_create_matrix(size_t rows, size_t cols)
  */
 void r_free_matrix(RNONNULL RMatrix *matrix)
 {
+    if (!matrix)
+        return;
     free(matrix->data);
     matrix->rows = 0;
     matrix->cols = 0;
@@ -47,18 +72,36 @@ void r_free_matrix(RNONNULL RMatrix *matrix)
  */
 RMatrix *r_mat_mul(const RNONNULL RMatrix *mat1, const RNONNULL RMatrix *mat2)
 {
-    RMatrix *result = r_create_matrix(mat1->rows, mat2->cols);
+    if (mat1->cols != mat2->rows)
+    {
+        printf("[ERROR]: r_mat_mul requires mat1->cols == mat2->rows\n");
+        return NULL;
+    }
 
+    RMatrix *result = r_create_matrix(mat1->rows, mat2->cols);
+    if (!result)
+        return NULL;
+
+    size_t result_size = MatrixSize(result);
+    for (size_t i = 0; i < result_size; i++)
+        result->data[i] = 0.0f;
+
+    // Cache-friendly i-k-j loop order
     for (size_t i = 0; i < mat1->rows; i++)
-        for (size_t j = 0; j < mat2->cols; j++)
+    {
+        const float *row1 = &mat1->data[i * mat1->cols];
+        float *row_res = &result->data[i * result->cols];
+
+        for (size_t k = 0; k < mat1->cols; k++)
         {
-            float sum = 0.0f;
-            for (size_t k = 0; k < mat2->rows; k++)
+            float val1 = row1[k];
+            const float *row2 = &mat2->data[k * mat2->cols];
+            for (size_t j = 0; j < mat2->cols; j++)
             {
-                sum += mat1->data[RMatrixIDX(i, k, mat1->cols)] * mat2->data[RMatrixIDX(k, j, mat2->cols)];
+                row_res[j] += val1 * row2[j];
             }
-            result->data[RMatrixIDX(i, j, result->cols)] = sum;
         }
+    }
     return result;
 }
 
@@ -73,12 +116,15 @@ RMatrix *r_mat_mul(const RNONNULL RMatrix *mat1, const RNONNULL RMatrix *mat2)
 RMatrix *r_mat_transpose(const RNONNULL RMatrix *matrix)
 {
     RMatrix *transposed_matrix = r_create_matrix(matrix->cols, matrix->rows);
+    if (!transposed_matrix)
+        return NULL;
+
     for (size_t i = 0; i < matrix->rows; i++)
     {
+        const float *src_row = &matrix->data[i * matrix->cols];
         for (size_t j = 0; j < matrix->cols; j++)
         {
-            transposed_matrix->data[RMatrixIDX(j, i, transposed_matrix->cols)] =
-                matrix->data[RMatrixIDX(i, j, matrix->cols)];
+            transposed_matrix->data[j * transposed_matrix->cols + i] = src_row[j];
         }
     }
     return transposed_matrix;

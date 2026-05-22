@@ -1,5 +1,21 @@
 #include <rc/r_loss_grad.h>
 
+static int has_same_shape(const RNONNULL RMatrix *lhs, const RNONNULL RMatrix *rhs)
+{
+    return lhs->rows == rhs->rows && lhs->cols == rhs->cols;
+}
+
+static int validate_grad_inputs(const RNONNULL RMatrix *pred, const RNONNULL RMatrix *real,
+                                const RNONNULL RMatrix *grad, const char *name)
+{
+    if (!has_same_shape(pred, real) || !has_same_shape(pred, grad))
+    {
+        printf("[ERROR]: %s requires pred, real and grad with matching shapes\n", name);
+        return 0;
+    }
+    return 1;
+}
+
 /**
  * r_cross_entropy_grad() - Compute cross-entropy gradient.
  * @pred: Predicted probabilities.
@@ -12,6 +28,11 @@
  */
 void r_cross_entropy_grad(const RNONNULL RMatrix *pred, const RNONNULL RMatrix *real, RMatrix *grad)
 {
+    if (!validate_grad_inputs(pred, real, grad, "r_cross_entropy_grad"))
+        return;
+    if (pred->rows == 0 || pred->cols == 0)
+        return;
+
     const float norm = (float)pred->rows;
     const size_t count = MatrixSize(pred);
     for (size_t i = 0; i < count; i++)
@@ -35,6 +56,11 @@ void r_cross_entropy_grad(const RNONNULL RMatrix *pred, const RNONNULL RMatrix *
  */
 void r_cat_cross_entropy_grad(const RNONNULL RMatrix *pred, const RNONNULL RMatrix *real, RMatrix *grad)
 {
+    if (!validate_grad_inputs(pred, real, grad, "r_cat_cross_entropy_grad"))
+        return;
+    if (pred->rows == 0 || pred->cols == 0)
+        return;
+
     const float norm = (float)pred->rows;
     const size_t count = MatrixSize(pred);
     for (size_t i = 0; i < count; i++)
@@ -58,6 +84,11 @@ void r_cat_cross_entropy_grad(const RNONNULL RMatrix *pred, const RNONNULL RMatr
  */
 void r_bin_cross_entropy_grad(const RNONNULL RMatrix *pred, const RNONNULL RMatrix *real, RMatrix *grad)
 {
+    if (!validate_grad_inputs(pred, real, grad, "r_bin_cross_entropy_grad"))
+        return;
+    if (pred->rows == 0 || pred->cols == 0)
+        return;
+
     const float norm = (float)(pred->rows * pred->cols);
     const size_t count = MatrixSize(pred);
     for (size_t i = 0; i < count; i++)
@@ -84,6 +115,11 @@ void r_bin_cross_entropy_grad(const RNONNULL RMatrix *pred, const RNONNULL RMatr
  */
 void r_mse_loss_grad(const RNONNULL RMatrix *pred, const RNONNULL RMatrix *real, RMatrix *grad)
 {
+    if (!validate_grad_inputs(pred, real, grad, "r_mse_loss_grad"))
+        return;
+    if (pred->rows == 0 || pred->cols == 0)
+        return;
+
     const float norm = (float)(pred->rows * pred->cols);
     const float scale = 2.0f / norm;
     const size_t count = MatrixSize(pred);
@@ -105,6 +141,11 @@ void r_mse_loss_grad(const RNONNULL RMatrix *pred, const RNONNULL RMatrix *real,
  */
 void r_mae_loss_grad(const RNONNULL RMatrix *pred, const RNONNULL RMatrix *real, RMatrix *grad)
 {
+    if (!validate_grad_inputs(pred, real, grad, "r_mae_loss_grad"))
+        return;
+    if (pred->rows == 0 || pred->cols == 0)
+        return;
+
     const float norm = (float)(pred->rows * pred->cols);
     const float inv_norm = 1.0f / norm;
     const size_t count = MatrixSize(pred);
@@ -137,6 +178,11 @@ void r_mae_loss_grad(const RNONNULL RMatrix *pred, const RNONNULL RMatrix *real,
 void r_bin_focal_loss_grad(const RNONNULL RMatrix *pred, const RNONNULL RMatrix *real, float gamma, float alpha,
                            RMatrix *grad)
 {
+    if (!validate_grad_inputs(pred, real, grad, "r_bin_focal_loss_grad"))
+        return;
+    if (pred->rows == 0 || pred->cols == 0)
+        return;
+
     const float norm = (float)(pred->rows * pred->cols);
     const float inv_norm = 1.0f / norm;
     const size_t count = MatrixSize(pred);
@@ -176,6 +222,11 @@ void r_bin_focal_loss_grad(const RNONNULL RMatrix *pred, const RNONNULL RMatrix 
  */
 void r_cat_focal_loss_grad(const RNONNULL RMatrix *pred, const RNONNULL RMatrix *real, float gamma, RMatrix *grad)
 {
+    if (!validate_grad_inputs(pred, real, grad, "r_cat_focal_loss_grad"))
+        return;
+    if (pred->rows == 0 || pred->cols == 0)
+        return;
+
     const float norm = (float)pred->rows;
     const float inv_norm = 1.0f / norm;
     const size_t count = MatrixSize(pred);

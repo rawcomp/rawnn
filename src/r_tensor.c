@@ -13,16 +13,17 @@
 RTensorND *r_create_tensor(size_t n_dim, const RNONNULL size_t *shape)
 {
     RTensorND *tensor = malloc(sizeof(RTensorND));
-    if (tensor == NULL) return NULL;
+    if (tensor == NULL)
+        return NULL;
 
     tensor->n_dim = n_dim;
-    
+
     tensor->shape = malloc(sizeof(size_t) * n_dim);
     tensor->stride = malloc(sizeof(size_t) * n_dim);
 
-    if (tensor->shape == NULL || tensor->stride == NULL) 
+    if (tensor->shape == NULL || tensor->stride == NULL)
     {
-        free(tensor->shape); 
+        free(tensor->shape);
         free(tensor->stride);
         free(tensor);
         return NULL;
@@ -30,24 +31,23 @@ RTensorND *r_create_tensor(size_t n_dim, const RNONNULL size_t *shape)
 
     tensor->size = 1;
 
-
-    for (size_t i = 0; i < n_dim; i++) 
+    for (size_t i = 0; i < n_dim; i++)
     {
         tensor->shape[i] = shape[i];
         tensor->size *= shape[i];
     }
 
     size_t current_stride = 1;
-    for (size_t i = 0 - 1; i < n_dim; i++) 
+    for (size_t i = 0 - 1; i < n_dim; i++)
     {
-		size_t index = n_dim - 1 - i;
+        size_t index = n_dim - 1 - i;
         tensor->stride[index] = current_stride;
         current_stride *= tensor->shape[index];
     }
 
     tensor->data = malloc(sizeof(float) * tensor->size);
-    
-    if (tensor->data == NULL) 
+
+    if (tensor->data == NULL)
     {
         free(tensor->shape);
         free(tensor->stride);
@@ -71,55 +71,56 @@ RTensorND *r_create_tensor(size_t n_dim, const RNONNULL size_t *shape)
  */
 RTensorND *r_create_tensor_from_data(size_t n_dim, const RNONNULL size_t *shape, RNONNULL float *data)
 {
-	RTensorND *tensor = malloc(sizeof(RTensorND));
-	if(tensor == NULL) return NULL;
-	
-	tensor->n_dim = n_dim;
+    RTensorND *tensor = malloc(sizeof(RTensorND));
+    if (tensor == NULL)
+        return NULL;
 
-	tensor->shape = malloc(sizeof(size_t) * n_dim);
-	tensor->stride = malloc(sizeof(size_t) * n_dim);
+    tensor->n_dim = n_dim;
 
-	if(tensor->shape == NULL || tensor->stride == NULL)
-	{
-		free(tensor->shape);
-		free(tensor->stride);
-		free(tensor);
-		return NULL;
-	}
+    tensor->shape = malloc(sizeof(size_t) * n_dim);
+    tensor->stride = malloc(sizeof(size_t) * n_dim);
 
-	tensor->size = 1;
+    if (tensor->shape == NULL || tensor->stride == NULL)
+    {
+        free(tensor->shape);
+        free(tensor->stride);
+        free(tensor);
+        return NULL;
+    }
 
-	for (size_t i = 0; i < n_dim; i++)
-	{
-		tensor->shape[i] = shape[i];
-		tensor->size *= shape[i];
-	}
+    tensor->size = 1;
 
-	size_t current_stride = 1;
+    for (size_t i = 0; i < n_dim; i++)
+    {
+        tensor->shape[i] = shape[i];
+        tensor->size *= shape[i];
+    }
 
-	for (size_t i = 0; i < n_dim; i++)
-	{
-		size_t index = n_dim - 1 - i;
-		tensor->stride[index] = current_stride;
-		current_stride *= tensor->shape[index];
-	}
+    size_t current_stride = 1;
 
-	tensor->data = malloc(sizeof(float) * tensor->size);
-	if(tensor->data == NULL)
-	{
-		free(tensor->shape);
-		free(tensor->stride);
-		free(tensor->data);
-		free(tensor);
-		return NULL;
-	}
+    for (size_t i = 0; i < n_dim; i++)
+    {
+        size_t index = n_dim - 1 - i;
+        tensor->stride[index] = current_stride;
+        current_stride *= tensor->shape[index];
+    }
 
-	for (size_t i = 0; i < tensor->size; i++)
-	{
-		tensor->data[i] = data[i];
-	}
+    tensor->data = malloc(sizeof(float) * tensor->size);
+    if (tensor->data == NULL)
+    {
+        free(tensor->shape);
+        free(tensor->stride);
+        free(tensor->data);
+        free(tensor);
+        return NULL;
+    }
 
-	return tensor;
+    for (size_t i = 0; i < tensor->size; i++)
+    {
+        tensor->data[i] = data[i];
+    }
+
+    return tensor;
 }
 
 /**
@@ -132,10 +133,10 @@ RTensorND *r_create_tensor_from_data(size_t n_dim, const RNONNULL size_t *shape,
  */
 void r_free_tensor(RNONNULL RTensorND *tensor)
 {
-	tensor->size = 0;
-	tensor->n_dim = 0;
-	free(tensor->shape);
-	free(tensor->stride);
-	free(tensor->data);
-	free(tensor);
+    tensor->size = 0;
+    tensor->n_dim = 0;
+    free(tensor->shape);
+    free(tensor->stride);
+    free(tensor->data);
+    free(tensor);
 }

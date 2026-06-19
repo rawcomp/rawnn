@@ -54,9 +54,10 @@ void r_activation_leaky_relu_grad(const RNONNULL RMatrix *input, const RNONNULL 
 void r_activation_gelu_grad(const RNONNULL RMatrix *input, const RNONNULL RMatrix *upstream_grad,
                             RNONNULL RMatrix *grad)
 {
-    float bsqrt2 = 1 / M_SQRT2;
-    float inv_sqrt_2pi = 1.0f / sqrtf(2.0f * M_PI);
+    const float bsqrt2 = (float)(1.0 / M_SQRT2);
+    const float inv_sqrt_2pi = 1.0f / sqrtf(2.0f * (float)M_PI);
     const size_t count = MatrixSize(input);
+    
     for (size_t i = 0; i < count; i++)
     {
         float val = input->data[i];

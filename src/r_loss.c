@@ -20,30 +20,35 @@ static int validate_loss_inputs(const RNONNULL RMatrix *pred, const RNONNULL RMa
     return 1;
 }
 
+static float clamp(float val, float min_val, float max_val)
+{
+    return fmaxf(min_val, fminf(val, max_val));
+}
+
 /**
  * r_cross_entropy() - Compute cross-entropy loss.
- * @matrix: Predicted probabilities.
- * @src: One-hot or target distribution matrix.
+ * @pred: Predicted probabilities.
+ * @real: One-hot or target distribution matrix.
  *
- * Accumulates -y * log(p + EPSILON) over all elements and normalizes by
+ * Accumulates -y * log(p) over all elements and normalizes by
  * the number of rows.
  * Return: Mean cross-entropy loss per row.
  */
-float r_cross_entropy(const RNONNULL RMatrix *matrix, const RNONNULL RMatrix *src)
+float r_cross_entropy(const RNONNULL RMatrix *pred, const RNONNULL RMatrix *real)
 {
-    if (!validate_loss_inputs(matrix, src, "r_cross_entropy"))
+    if (!validate_loss_inputs(pred, real, "r_cross_entropy"))
         return NAN;
 
     float total = 0.0f;
-    const size_t count = MatrixSize(matrix);
+    const size_t count = MatrixSize(pred);
     for (size_t i = 0; i < count; i++)
     {
-        float prediction = matrix->data[i];
-        float correct = src->data[i];
-        total += correct * log(prediction + EPSILON);
+        float prediction = clamp(pred->data[i], EPSILON, 1.0f - EPSILON);
+        float correct = real->data[i];
+        total += correct * logf(prediction);
     }
 
-    return -total / src->rows;
+    return -total / real->rows;
 }
 
 /**
@@ -65,8 +70,8 @@ float r_bin_cross_entropy(const RNONNULL RMatrix *pred, const RNONNULL RMatrix *
     for (size_t i = 0; i < count; i++)
     {
         float currentReal = real->data[i];
-        float currentPred = pred->data[i];
-        total += currentReal * log(currentPred + EPSILON) + (1.0f - currentReal) * log(1.0f - currentPred + EPSILON);
+        float currentPred = clamp(pred->data[i], EPSILON, 1.0f - EPSILON);
+        total += currentReal * logf(currentPred) + (1.0f - currentReal) * logf(1.0f - currentPred);
     }
 
     return -total / (real->cols * real->rows);
@@ -77,7 +82,7 @@ float r_bin_cross_entropy(const RNONNULL RMatrix *pred, const RNONNULL RMatrix *
  * @pred: Predicted class probabilities.
  * @real: One-hot encoded target labels.
  *
- * Accumulates -y * log(p + EPSILON) over all elements and normalizes by
+ * Accumulates -y * log(p) over all elements and normalizes by
  * the number of rows.
  * Return: Mean categorical cross-entropy loss per row.
  */
@@ -90,9 +95,9 @@ float r_cat_cross_entropy(const RNONNULL RMatrix *pred, const RNONNULL RMatrix *
     const size_t count = MatrixSize(real);
     for (size_t i = 0; i < count; i++)
     {
-        float prediction = pred->data[i];
+        float prediction = clamp(pred->data[i], EPSILON, 1.0f - EPSILON);
         float correct = real->data[i];
-        total += correct * log(prediction + EPSILON);
+        total += correct * logf(prediction);
     }
 
     return -total / real->rows;
@@ -167,11 +172,10 @@ float r_bin_focal_loss(const RNONNULL RMatrix *pred, const RNONNULL RMatrix *rea
     for (size_t i = 0; i < count; i++)
     {
         float y = real->data[i];
-        float p = pred->data[i];
+        float p = clamp(pred->data[i], EPSILON, 1.0f - EPSILON);
 
-        float term1 = alpha * y * powf(1.0f - p, gamma) * logf(p + EPSILON);
-
-        float term2 = (1.0f - alpha) * (1.0f - y) * powf(p, gamma) * logf(1.0f - p + EPSILON);
+        float term1 = alpha * y * powf(1.0f - p, gamma) * logf(p);
+        float term2 = (1.0f - alpha) * (1.0f - y) * powf(p, gamma) * logf(1.0f - p);
 
         total += term1 + term2;
     }
@@ -198,13 +202,13 @@ float r_cat_focal_loss(const RNONNULL RMatrix *pred, const RNONNULL RMatrix *rea
     const size_t count = MatrixSize(real);
     for (size_t i = 0; i < count; i++)
     {
-        float prediction = pred->data[i];
+        float prediction = clamp(pred->data[i], EPSILON, 1.0f - EPSILON);
         float correct = real->data[i];
 
         if (correct > 0.0f)
         {
             float mod_factor = powf(1.0f - prediction, gamma);
-            total += correct * mod_factor * logf(prediction + EPSILON);
+            total += correct * mod_factor * logf(prediction);
         }
     }
 

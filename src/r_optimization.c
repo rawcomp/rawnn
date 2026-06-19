@@ -114,6 +114,8 @@ void r_optimization_adam(RNONNULL RMatrix *theta, const RNONNULL RMatrix *grad, 
         return;
     }
 
+    if (t == 0) t = 1; // Prevent division by zero if initialized at t=0
+
     float beta1_t = 1.0f - powf(beta1, (float)t);
     float beta2_t = 1.0f - powf(beta2, (float)t);
 
@@ -123,7 +125,6 @@ void r_optimization_adam(RNONNULL RMatrix *theta, const RNONNULL RMatrix *grad, 
         float g = grad->data[i];
 
         m->data[i] = beta1 * m->data[i] + (1.0f - beta1) * g;
-
         v->data[i] = beta2 * v->data[i] + (1.0f - beta2) * (g * g);
 
         float m_hat = m->data[i] / beta1_t;

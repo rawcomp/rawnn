@@ -1,10 +1,10 @@
 #ifndef RC_R_TYPES_H
 #define RC_R_TYPES_H
 
+#include <math.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stddef.h>
-#include <math.h>
 
 /**
  * RC_VERSION_MAJOR - Major version number.
@@ -30,37 +30,36 @@
  * @minor: Minor version number.
  * @patch: Patch version number.
  */
-#define RC_VERSION_ENCODE(major, minor, patch) \
-    ((major) * 10000 + (minor) * 100 + (patch))
+#define RC_VERSION_ENCODE(major, minor, patch)                                 \
+	((major) * 10000 + (minor) * 100 + (patch))
 
 /**
  * RC_VERSION - Encoded version integer using RC_VERSION_*.
  */
-#define RC_VERSION \
-    RC_VERSION_ENCODE(RC_VERSION_MAJOR, RC_VERSION_MINOR, RC_VERSION_PATCH)
-
+#define RC_VERSION                                                             \
+	RC_VERSION_ENCODE(RC_VERSION_MAJOR, RC_VERSION_MINOR, RC_VERSION_PATCH)
 
 /**
- * RNONNULL - Annotation macro for non-null pointers.
+ * - Annotation macro for non-null pointers.
  */
 #define RNONNULL
 /**
- * RNULLABLE - Annotation macro for nullable pointers.
+ * - Annotation macro for nullable pointers.
  */
 #define RNULLABLE
 
 /**
- * RMatrixIDX() - Compute row-major index for a matrix element.
+ * R_MATRIX_IDX() - Compute row-major index for a matrix element.
  * @i: Row index.
  * @j: Column index.
  * @cols: Number of columns in the matrix.
  */
-#define RMatrixIDX(i, j, cols) ((i) * (cols) + (j))
+#define R_MATRIX_IDX(i, j, cols) ((i) * (cols) + (j))
 /**
- * MatrixSize() - Compute number of elements in a matrix.
+ * R_MATRIX_SIZE() - Compute number of elements in a matrix.
  * @matrix: Matrix pointer.
  */
-#define MatrixSize(matrix) ((matrix->rows) * (matrix->cols))
+#define R_MATRIX_SIZE(matrix) (((matrix)->rows) * ((matrix)->cols))
 
 /**
  * EPSILON - Small constant for numerical stability.

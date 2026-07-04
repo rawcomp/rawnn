@@ -1,4 +1,5 @@
 #include <rc/r_vector.h>
+#include <stdint.h>
 
 /**
  * r_create_vector() - Allocate a vector.
@@ -10,26 +11,29 @@
  */
 RVector *r_create_vector(size_t size)
 {
-    RVector *vector = malloc(sizeof(RVector));
-    if (!vector)
-        return NULL;
+	RVector *vector;
 
-    vector->size = size;
+	if (size > SIZE_MAX / sizeof(float))
+		return NULL;
 
-    if (size == 0)
-    {
-        vector->data = NULL;
-        return vector;
-    }
+	vector = malloc(sizeof(*vector));
+	if (!vector)
+		return NULL;
 
-    vector->data = malloc(sizeof(float) * size);
-    if (!vector->data)
-    {
-        free(vector);
-        return NULL;
-    }
+	vector->size = size;
 
-    return vector;
+	if (size == 0) {
+		vector->data = NULL;
+		return vector;
+	}
+
+	vector->data = malloc(sizeof(*vector->data) * size);
+	if (!vector->data) {
+		free(vector);
+		return NULL;
+	}
+
+	return vector;
 }
 
 /**
@@ -40,13 +44,14 @@ RVector *r_create_vector(size_t size)
  * vector structure.
  * Return: Nothing.
  */
-void r_free_vector(RNONNULL RVector *vector)
+void r_free_vector(RVector *vector)
 {
-    if (!vector)
-        return;
-    free(vector->data);
-    vector->size = 0;
-    free(vector);
+	if (!vector)
+		return;
+
+	free(vector->data);
+	vector->size = 0;
+	free(vector);
 }
 
 /**
@@ -58,90 +63,104 @@ void r_free_vector(RNONNULL RVector *vector)
  * @vector->size. On size mismatch, prints an error and returns NULL.
  * Return: Newly allocated result vector, or NULL on size mismatch.
  */
-RVector *r_mat_vec_mul(const RNONNULL RMatrix *matrix, const RNONNULL RVector *vector)
+RVector *r_mat_vec_mul(const RMatrix *matrix, const RVector *vector)
 {
-    if (matrix->cols != vector->size)
-    {
-        printf("[ERROR]: The number of columns in the matrix should be the same as the vector size\n");
-        return NULL;
-    }
+	RVector *result;
+	size_t i;
+	size_t j;
 
-    RVector *result = r_create_vector(matrix->rows);
-    if (!result)
-        return NULL;
+	if (!matrix || !vector || matrix->cols != vector->size) {
+		fprintf(stderr, "[ERROR]: The number of columns in the matrix "
+				"should be the same as the vector size\n");
+		return NULL;
+	}
 
-    for (size_t i = 0; i < matrix->rows; i++)
-    {
-        float sum = 0.0f;
-        const float *row = &matrix->data[i * matrix->cols];
-        for (size_t j = 0; j < matrix->cols; j++)
-        {
-            sum += row[j] * vector->data[j];
-        }
-        result->data[i] = sum;
-    }
+	result = r_create_vector(matrix->rows);
+	if (!result)
+		return NULL;
 
-    return result;
+	for (i = 0; i < matrix->rows; i++) {
+		double sum = 0.0;
+		const float *row = &matrix->data[i * matrix->cols];
+
+		for (j = 0; j < matrix->cols; j++)
+			sum += (double)row[j] * vector->data[j];
+
+		result->data[i] = (float)sum;
+	}
+
+	return result;
 }
 
 /**
- * r_vec_dot() - Compute dot product of two vectors.
+ * r_vector_dot() - Compute dot product of two vectors.
  * @vector1: First vector.
  * @vector2: Second vector.
  *
  * Computes the dot product when sizes match. On size mismatch, prints
- * an error and returns 0.0f.
- * Return: Dot product of the vectors, or 0.0f on size mismatch.
+ * an error and returns NAN.
+ * Return: Dot product of the vectors, or NAN on size mismatch.
  */
-float r_vec_dot(const RNONNULL RVector *vector1, const RNONNULL RVector *vector2)
+float r_vector_dot(const RVector *vector1, const RVector *vector2)
 {
-    if (vector1->size != vector2->size)
-    {
-        printf("[ERROR]: The vectors should have the same size\n");
-        return 0.0f;
-    }
+	double result = 0.0;
+	size_t i;
 
-    float result = 0.0f;
-    for (size_t i = 0; i < vector1->size; i++)
-    {
-        result += vector1->data[i] * vector2->data[i];
-    }
+	if (!vector1 || !vector2 || vector1->size != vector2->size) {
+		fprintf(stderr,
+			"[ERROR]: The vectors should have the same size\n");
+		return NAN;
+	}
 
-    return result;
+	for (i = 0; i < vector1->size; i++)
+		result += (double)vector1->data[i] * vector2->data[i];
+
+	return (float)result;
 }
 
 /**
- * r_add_bias() - Add a bias term to each element of a vector.
+ * r_vector_add_bias() - Add a bias vector to each element of a vector.
  * @vector: Vector updated in place.
- * @bias: Bias value to add.
+ * @bias: Bias vector to add.
  *
  * Adds @bias to every element in @vector.
  * Return: Nothing.
  */
-void r_add_bias(RNONNULL RVector *vector, float bias)
+void r_vector_add_bias(RVector *vector, const RVector *bias)
 {
-    for (size_t i = 0; i < vector->size; i++)
-    {
-        vector->data[i] += bias;
-    }
+	size_t i;
+
+	if (!vector || !bias || vector->size != bias->size) {
+		fprintf(stderr,
+			"[ERROR]: The vectors should have the same size\n");
+		return;
+	}
+
+	for (i = 0; i < vector->size; i++)
+		vector->data[i] += bias->data[i];
 }
 
 /**
- * r_print_vector() - Print a vector with a label.
+ * r_print_vector(stdout, ) - Print a vector with a label.
+ * @stream: Output stream.
  * @vector: Vector to print.
  * @name: Label to print before the vector.
  *
- * Outputs the vector values to stdout using a fixed two-decimal format.
+ * Outputs the vector values to @stream using a fixed two-decimal format.
  * Return: Nothing.
  */
-void r_print_vector(RNONNULL RVector *vector, const RNONNULL char *name)
+void r_print_vector(FILE *stream, const RVector *vector, const char *name)
 {
-    printf("%s = [", name);
-    for (size_t i = 0; i < vector->size; i++)
-    {
-        printf("%.2f", vector->data[i]);
-        if (i < vector->size - 1)
-            printf(", ");
-    }
-    printf("]\n");
+	size_t i;
+
+	if (!stream || !vector || !name)
+		return;
+
+	fprintf(stream, "%s = [", name);
+	for (i = 0; i < vector->size; i++) {
+		fprintf(stream, "%.2f", vector->data[i]);
+		if (i < vector->size - 1)
+			fprintf(stream, ", ");
+	}
+	fprintf(stream, "]\n");
 }

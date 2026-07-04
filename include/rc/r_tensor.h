@@ -11,17 +11,17 @@
  * @stride: Array of strides with length @n_dim.
  * @size: Total number of elements.
  */
-typedef struct r_tensor_t
-{
+typedef struct r_tensor_t {
 	float *data;
 	size_t n_dim;
 	size_t *shape;
-	size_t *stride;	
+	size_t *stride;
 	size_t size;
 } RTensorND;
 
-RTensorND *r_create_tensor(size_t n_dim, const RNONNULL size_t *shape);
-RTensorND *r_create_tensor_from_data(size_t n_dim, const RNONNULL size_t *shape, RNONNULL float *data);
-void r_free_tensor(RNONNULL RTensorND *tensor);
+RTensorND *r_create_tensor(size_t n_dim, const size_t *shape);
+RTensorND *r_create_tensor_from_data(size_t n_dim, const size_t *shape,
+				     float *data);
+void r_free_tensor(RTensorND *tensor);
 
 #endif

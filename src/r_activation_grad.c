@@ -1,4 +1,5 @@
 #include <rc/r_activation_grad.h>
+#include <rc/r_utils.h>
 
 /**
  * r_activation_relu_grad() - Compute ReLU gradient.
@@ -10,14 +11,20 @@
  * and scaling by @upstream_grad.
  * Return: Nothing.
  */
-void r_activation_relu_grad(const RNONNULL RMatrix *input, const RNONNULL RMatrix *upstream_grad,
-                            RNONNULL RMatrix *grad)
+void r_activation_relu_grad(const RMatrix *input, const RMatrix *upstream_grad,
+			    RMatrix *grad)
 {
-    const size_t count = MatrixSize(input);
-    for (size_t i = 0; i < count; i++)
-    {
-        grad->data[i] = (input->data[i] > 0.0f) ? upstream_grad->data[i] : 0.0f;
-    }
+	size_t count;
+	size_t i;
+
+	if (!r_has_same_shape(input, upstream_grad) ||
+	    !r_has_same_shape(input, grad))
+		return;
+
+	count = R_MATRIX_SIZE(input);
+	for (i = 0; i < count; i++)
+		grad->data[i] =
+		    input->data[i] > 0.0f ? upstream_grad->data[i] : 0.0f;
 }
 
 /**
@@ -31,14 +38,22 @@ void r_activation_relu_grad(const RNONNULL RMatrix *input, const RNONNULL RMatri
  * @alpha while passing positive gradients through unchanged.
  * Return: Nothing.
  */
-void r_activation_leaky_relu_grad(const RNONNULL RMatrix *input, const RNONNULL RMatrix *upstream_grad, float alpha,
-                                  RNONNULL RMatrix *grad)
+void r_activation_leaky_relu_grad(const RMatrix *input,
+				  const RMatrix *upstream_grad, float alpha,
+				  RMatrix *grad)
 {
-    const size_t count = MatrixSize(input);
-    for (size_t i = 0; i < count; i++)
-    {
-        grad->data[i] = (input->data[i] > 0.0f) ? upstream_grad->data[i] : upstream_grad->data[i] * alpha;
-    }
+	size_t count;
+	size_t i;
+
+	if (!r_has_same_shape(input, upstream_grad) ||
+	    !r_has_same_shape(input, grad))
+		return;
+
+	count = R_MATRIX_SIZE(input);
+	for (i = 0; i < count; i++)
+		grad->data[i] = input->data[i] > 0.0f
+				    ? upstream_grad->data[i]
+				    : upstream_grad->data[i] * alpha;
 }
 
 /**
@@ -51,24 +66,27 @@ void r_activation_leaky_relu_grad(const RNONNULL RMatrix *input, const RNONNULL 
  * by @upstream_grad into @grad.
  * Return: Nothing.
  */
-void r_activation_gelu_grad(const RNONNULL RMatrix *input, const RNONNULL RMatrix *upstream_grad,
-                            RNONNULL RMatrix *grad)
+void r_activation_gelu_grad(const RMatrix *input, const RMatrix *upstream_grad,
+			    RMatrix *grad)
 {
-    const float bsqrt2 = (float)(1.0 / M_SQRT2);
-    const float inv_sqrt_2pi = 1.0f / sqrtf(2.0f * (float)M_PI);
-    const size_t count = MatrixSize(input);
-    
-    for (size_t i = 0; i < count; i++)
-    {
-        float val = input->data[i];
+	const float bsqrt2 = (float)(1.0 / M_SQRT2);
+	const float inv_sqrt_2pi = 1.0f / sqrtf(2.0f * (float)M_PI);
+	size_t count;
+	size_t i;
 
-        float cdf = 0.5f * (1.0f + erff(val * bsqrt2));
-        float pdf = inv_sqrt_2pi * expf(-0.5f * val * val);
+	if (!r_has_same_shape(input, upstream_grad) ||
+	    !r_has_same_shape(input, grad))
+		return;
 
-        float local_grad = cdf + (val * pdf);
+	count = R_MATRIX_SIZE(input);
+	for (i = 0; i < count; i++) {
+		float val = input->data[i];
+		float cdf = 0.5f * (1.0f + erff(val * bsqrt2));
+		float pdf = inv_sqrt_2pi * expf(-0.5f * val * val);
+		float local_grad = cdf + (val * pdf);
 
-        grad->data[i] = local_grad * upstream_grad->data[i];
-    }
+		grad->data[i] = local_grad * upstream_grad->data[i];
+	}
 }
 
 /**
@@ -81,24 +99,32 @@ void r_activation_gelu_grad(const RNONNULL RMatrix *input, const RNONNULL RMatri
  * @output and @upstream_grad, writing the result to @grad.
  * Return: Nothing.
  */
-void r_activation_softmax_grad(const RNONNULL RMatrix *output, const RNONNULL RMatrix *upstream_grad,
-                               RNONNULL RMatrix *grad)
+void r_activation_softmax_grad(const RMatrix *output,
+			       const RMatrix *upstream_grad, RMatrix *grad)
 {
-    for (size_t i = 0; i < output->rows; i++)
-    {
-        float dot = 0.0f;
-        for (size_t j = 0; j < output->cols; j++)
-        {
-            size_t index = RMatrixIDX(i, j, output->cols);
-            dot += upstream_grad->data[index] * output->data[index];
-        }
+	size_t i;
+	size_t j;
 
-        for (size_t j = 0; j < output->cols; j++)
-        {
-            size_t index = RMatrixIDX(i, j, output->cols);
-            grad->data[index] = output->data[index] * (upstream_grad->data[index] - dot);
-        }
-    }
+	if (!r_has_same_shape(output, upstream_grad) ||
+	    !r_has_same_shape(output, grad))
+		return;
+
+	for (i = 0; i < output->rows; i++) {
+		float dot = 0.0f;
+
+		for (j = 0; j < output->cols; j++) {
+			size_t index = R_MATRIX_IDX(i, j, output->cols);
+
+			dot += upstream_grad->data[index] * output->data[index];
+		}
+
+		for (j = 0; j < output->cols; j++) {
+			size_t index = R_MATRIX_IDX(i, j, output->cols);
+
+			grad->data[index] = output->data[index] *
+					    (upstream_grad->data[index] - dot);
+		}
+	}
 }
 
 /**
@@ -111,16 +137,22 @@ void r_activation_softmax_grad(const RNONNULL RMatrix *output, const RNONNULL RM
  * scaled gradient into @grad.
  * Return: Nothing.
  */
-void r_activation_swish_grad(const RNONNULL RMatrix *input, const RNONNULL RMatrix *upstream_grad,
-                             RNONNULL RMatrix *grad)
+void r_activation_swish_grad(const RMatrix *input, const RMatrix *upstream_grad,
+			     RMatrix *grad)
 {
-    const size_t count = MatrixSize(input);
-    for (size_t i = 0; i < count; i++)
-    {
-        float val = input->data[i];
-        float sigmoid = 1.0f / (1.0f + expf(-val));
-        float local_grad = sigmoid + val * sigmoid * (1.0f - sigmoid);
+	size_t count;
+	size_t i;
 
-        grad->data[i] = upstream_grad->data[i] * local_grad;
-    }
+	if (!r_has_same_shape(input, upstream_grad) ||
+	    !r_has_same_shape(input, grad))
+		return;
+
+	count = R_MATRIX_SIZE(input);
+	for (i = 0; i < count; i++) {
+		float val = input->data[i];
+		float sigmoid = 1.0f / (1.0f + expf(-val));
+		float local_grad = sigmoid + val * sigmoid * (1.0f - sigmoid);
+
+		grad->data[i] = upstream_grad->data[i] * local_grad;
+	}
 }

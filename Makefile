@@ -1,11 +1,14 @@
-CC      := gcc
-CFLAGS  := -Wall -Wextra -Werror -pedantic -std=c99 -I./include \
-           -Wshadow -Wformat=2  -Wstrict-prototypes  \
-           -Wmissing-prototypes -Wnull-dereference                \
-            -Wundef -Wwrite-strings             \
-           -Wfloat-equal -Wcast-qual -Wpointer-arith              \
-           -fstack-protector-strong -fno-common
-LDFLAGS := -lm
+CC ?= gcc
+AR ?= ar
+ARFLAGS ?= rcs
+CFLAGS ?= -O2 -g
+CFLAGS += -Wall -Wextra -Werror -pedantic -std=c99 -I./include \
+          -Wshadow -Wformat=2 -Wstrict-prototypes \
+          -Wmissing-prototypes -Wnull-dereference \
+          -Wundef -Wwrite-strings \
+          -Wfloat-equal -Wcast-qual -Wpointer-arith \
+          -fstack-protector-strong -fno-common -MMD -MP
+LDLIBS := -lm
 VALGRIND := valgrind --leak-check=full --show-leak-kinds=all --errors-for-leak-kinds=all --error-exitcode=1
 
 PREFIX ?= /usr/local
@@ -26,14 +29,14 @@ TESTS     := $(patsubst $(TEST_DIR)/%.c, $(BUILD_DIR)/$(TEST_DIR)/%, $(TEST_SRCS
 
 HEADERS   := $(wildcard $(INC_DIR)/*.h) $(wildcard $(INC_DIR)/rc/*.h)
 
-.PHONY: all test valgrind clean format install
+.PHONY: all test valgrind clean format install uninstall
 
 all: $(LIB_NAME)
 
 $(LIB_NAME): $(SRC_OBJS)
 	@mkdir -p $(dir $@)
 	@echo "---- Building library $(notdir $@) ----"
-	ar rcs $@ $^
+	$(AR) $(ARFLAGS) $@ $^
 
 $(BUILD_DIR)/$(SRC_DIR)/%.o: $(SRC_DIR)/%.c
 	@mkdir -p $(dir $@)
@@ -57,13 +60,13 @@ test: $(LIB_NAME) $(TESTS)
 
 $(BUILD_DIR)/$(TEST_DIR)/%: $(BUILD_DIR)/$(TEST_DIR)/%.o $(LIB_NAME)
 	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $< $(LIB_NAME) -o $@ $(LDFLAGS)
+	$(CC) $(CFLAGS) $< $(LIB_NAME) -o $@ $(LDFLAGS) $(LDLIBS)
 
 $(BUILD_DIR)/$(TEST_DIR)/%.o: $(TEST_DIR)/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-valgrind: test
+valgrind: $(LIB_NAME) $(TESTS)
 	@echo "---- Starting Valgrind checks ----"
 	@for exe in $(TESTS); do \
 		log_file="$$exe.valgrind.log"; \
@@ -79,20 +82,28 @@ valgrind: test
 	done
 
 format:
-	@echo "---- Formatting files with clang-format (Microsoft style) ----"
-	clang-format -i --style=Microsoft $(SRC_FILES) $(TEST_SRCS) $(HEADERS)
+	@echo "---- Formatting files with clang-format (Linux kernel style) ----"
+	clang-format -i -style=file $(SRC_FILES) $(TEST_SRCS) $(HEADERS)
 
 install: $(LIB_NAME)
 	@echo "---- Installing library and headers ----"
-	@mkdir -p $(DESTDIR)$(PREFIX)/lib
-	@mkdir -p $(DESTDIR)$(PREFIX)/include/rc
-	cp $(LIB_NAME) $(DESTDIR)$(PREFIX)/lib/
-	cp $(wildcard $(INC_DIR)/rc/*.h) $(DESTDIR)$(PREFIX)/include/rc/
+	install -d $(DESTDIR)$(PREFIX)/lib
+	install -d $(DESTDIR)$(PREFIX)/include/rc
+	install -m 644 $(LIB_NAME) $(DESTDIR)$(PREFIX)/lib/
+	install -m 644 $(wildcard $(INC_DIR)/rc/*.h) $(DESTDIR)$(PREFIX)/include/rc/
 	@if [ -n "$$(ls -A $(INC_DIR)/*.h 2>/dev/null)" ]; then \
-		cp $(INC_DIR)/*.h $(DESTDIR)$(PREFIX)/include/; \
+		install -m 644 $(INC_DIR)/*.h $(DESTDIR)$(PREFIX)/include/; \
 	fi
 	@echo "---- Install completed ----"
+
+uninstall:
+	@echo "---- Uninstalling library and headers ----"
+	rm -f $(DESTDIR)$(PREFIX)/lib/rawcompute.a
+	rm -rf $(DESTDIR)$(PREFIX)/include/rc
+	@echo "---- Uninstall completed ----"
 
 clean:
 	rm -rf $(BUILD_DIR)
 	@echo "---- Clean completed ----"
+
+-include $(SRC_OBJS:.o=.d) $(TEST_OBJS:.o=.d)

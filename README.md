@@ -8,8 +8,19 @@ RawCompute demonstrates how neural networks are built from first principles, pro
 - **Matrix operations** (multiplication, transposition, indexing)
 - **Vector operations** (dot product, vector-matrix multiplication, bias addition)
 - **Dense layers** (fully connected layers with weights and biases)
+- **Activation functions** (ReLU, Leaky ReLU, Softmax, Swish, GELU)
+- **Loss functions** (MSE, Cross-Entropy)
+- **Optimization** (SGD, Adam)
 
 This project is perfect for learning how neural network computations work at the C level, before moving to high-level frameworks like TensorFlow or PyTorch.
+
+## Dependencies
+- Standard C99 compiler (e.g. `gcc` or `clang`)
+- GNU `make`
+- `ar` (for archiving static library)
+- `libm` (Standard math library)
+- `valgrind` (Optional, for memory leak testing)
+- `clang-format` (Optional, for formatting)
 
 ## Project Status
 
@@ -21,73 +32,63 @@ This project is perfect for learning how neural network computations work at the
 - ✅ Activation functions
 - ✅ Loss functions
 - ✅ Optimization
-- ⏳ Backpropagation
+- ⏳ Backpropagation (Full graph)
 - ⏳ Additional layer types
 
 ## Core Components
 
-### 1. Matrix Operations (`r_matrix.h/c`)
+### 1. Types & Macros (`r_types.h/c`)
+Basic macros for versioning and utility definitions like `EPSILON` and matrix indexing `R_MATRIX_IDX`.
+The umbrella header for the library is `<rc/rc.h>`.
 
-Implements a 2D matrix structure and essential operations:
+### 2. Matrix Operations (`r_matrix.h/c`)
+Implements a 2D matrix structure and operations: `r_create_matrix`, `r_free_matrix`, `r_matrix_mul`, `r_matrix_transpose`, `r_print_matrix`.
 
-- **`RMatrix *r_create_matrix(size_t rows, size_t cols)`** - Allocate a matrix
-- **`void r_free_matrix(RMatrix *matrix)`** - Free matrix memory
-- **`RMatrix *r_mat_mul(RMatrix *mat1, RMatrix *mat2)`** - Standard matrix multiplication
-- **`RMatrix *r_mat_transpose(RMatrix *matrix)`** - Matrix transposition
-- **`void r_print_matrix(RMatrix *m, char *name)`** - Pretty-print a matrix
+### 3. Vector Operations (`r_vector.h/c`)
+Implements a 1D vector structure and operations: `r_create_vector`, `r_free_vector`, `r_vector_dot`, `r_vector_add_bias`, `r_mat_vec_mul`.
 
-### 2. Vector Operations (`r_vector.h/c`)
+### 4. Tensor Operations (`r_tensor.h/c`)
+N-dimensional tensor support for multi-dimensional operations: `r_create_tensor`, `r_create_tensor_from_data`, `r_free_tensor`.
 
-Implements a 1D vector structure and operations:
+### 5. Dense Layer (`r_layer_dense.h/c`)
+Implements a fully connected layer: `r_create_layer`, `r_free_layer`, `r_layer_forward`.
 
-- **`RVector *r_create_vector(size_t size)`** - Allocate a vector
-- **`void r_free_vector(RVector *vector)`** - Free vector memory
-- **`RVector *r_mat_vec_mul(RMatrix *matrix, RVector *vector)`** - Matrix-vector multiplication
-- **`float r_vec_dot(RVector *v1, RVector *v2)`** - Dot product of two vectors
-- **`void r_add_bias(RVector *vector, float bias)`** - Add bias to a vector
-- **`void r_print_vector(RVector *vector, char *name)`** - Pretty-print a vector
+### 6. Activations (`r_activation.h/c`)
+Functions for non-linear activations: `r_activation_relu`, `r_activation_softmax`, `r_activation_gelu`, `r_activation_swish`.
 
-### 3. Dense Layer (`r_layer_dense.h/c`)
+### 7. Activation Gradients (`r_activation_grad.h/c`)
+Gradient calculations for backpropagation of activations.
 
-Implements a fully connected neural network layer:
+### 8. Loss (`r_loss.h/c`)
+Functions for error measurement: `r_mse_loss`, `r_cross_entropy`, `r_focal_loss`.
 
-```c
-typedef struct r_layer_dense_t {
-    RMatrix *weights;   // Layer weights (neurons × inputs)
-    RVector *biases;    // Layer biases (neurons)
-} RLayerDense;
-```
+### 9. Loss Gradients (`r_loss_grad.h/c`)
+Gradient calculations for loss functions.
 
-- **`RLayerDense *r_create_layer(size_t n_inputs, size_t n_neurons)`** - Create a dense layer
-- **`void r_free_layer(RLayerDense *layer)`** - Free layer memory
-- **`RMatrix *r_layer_forward(RLayerDense *layer, RMatrix *inputs)`** - Forward pass computation
-
-The forward pass computes: `output = input × weights^T + bias`
+### 10. Optimization (`r_optimization.h/c`)
+Algorithms for updating weights: `r_optimization_sgd`, `r_optimization_adam`.
 
 ## Building and Running
 
 ### Build
 ```bash
-gcc gcc tests/test_activation.c src/r_matrix.c src/r_activation.c src/r_vector.c src/r_layer_dense.c -I./include/ -o test_neuron -lm
+make
 ```
 
-### Run
+### Run Tests
 ```bash
-./test_neuron
+make test
 ```
 
-### Example Output
-The test program demonstrates three scenarios:
-1. **Single Neuron** - Basic neuron computation
-2. **Layer with 3 Neurons** - Multiple neurons processing the same input
-3. **Batch Processing** - Processing multiple samples through a dense layer
+### Run Valgrind
+```bash
+make valgrind
+```
 
 ## Usage Example
 
 ```c
-#include <rc/r_matrix.h>
-#include <rc/r_vector.h>
-#include <rc/r_layer_dense.h>
+#include <rc/rc.h>
 
 // Create a dense layer with 4 inputs and 3 neurons
 RLayerDense *layer = r_create_layer(4, 3);
@@ -100,7 +101,7 @@ RMatrix *input = r_create_matrix(2, 4);
 RMatrix *output = r_layer_forward(layer, input);
 
 // Print results
-r_print_matrix(output, "Layer Output");
+r_print_matrix(stdout, output, "Layer Output");
 
 // Cleanup
 r_free_matrix(input);
@@ -108,37 +109,16 @@ r_free_matrix(output);
 r_free_layer(layer);
 ```
 
-## Key Features
-
-- **Pure C implementation** - No external dependencies, standard C library only
-- **Educational focus** - Clear, readable code to understand neural network mechanics
-- **Memory management** - Explicit allocation and deallocation for learning purposes
-- **Basic tensor operations** - Essential linear algebra for neural networks
-- **Batch processing support** - Compute multiple samples simultaneously
-
-## Technical Details
-
-### Memory Layout
-
-Matrices and vectors use flat C arrays with row-major ordering:
-- Matrix element `[i, j]` is stored at index `i * cols + j`
-- Uses the macro: `RMatrixIDX(i, j, cols)`
-
-### Data Type
-
-All computations use `float` (32-bit floating-point).
-
 ## Limitations and Future Improvements
 
 Currently planned features being implemented:
-- Activation functions (ReLU, Sigmoid, Tanh, Softmax)
-- Loss functions (MSE, Cross-Entropy)
-- Optimization algorithms (SGD, Adam, RMSprop)
 - Backpropagation implementation
 - Support for multiple layer types (Convolutional, Recurrent, etc.)
+- Multi-threading support (OpenMP)
+- Batched operations across multiple layers
 
 **Inspiration:** This project follows the curriculum and concepts from [Neural Networks from Scratch in Python](https://nnfs.io/) but implements them in C for educational purposes.
 
 ## License
 
-This project is provided as-is for educational purposes.
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.

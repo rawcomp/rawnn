@@ -1,9 +1,5 @@
 #include <rc/r_optimization.h>
-
-static int has_same_shape(const RNONNULL RMatrix *lhs, const RNONNULL RMatrix *rhs)
-{
-    return lhs->rows == rhs->rows && lhs->cols == rhs->cols;
-}
+#include <rc/r_utils.h>
 
 /**
  * r_optimization_sgd() - Perform an SGD parameter update.
@@ -14,19 +10,20 @@ static int has_same_shape(const RNONNULL RMatrix *lhs, const RNONNULL RMatrix *r
  * Applies a simple SGD update: theta -= eta * grad.
  * Return: Nothing.
  */
-void r_optimization_sgd(RNONNULL RMatrix *theta, const RNONNULL RMatrix *grad, float eta)
+void r_optimization_sgd(RMatrix *theta, const RMatrix *grad, float eta)
 {
-    if (!has_same_shape(theta, grad))
-    {
-        printf("[ERROR]: r_optimization_sgd requires theta and grad with matching shapes\n");
-        return;
-    }
+	size_t count;
+	size_t i;
 
-    const size_t count = MatrixSize(theta);
-    for (size_t i = 0; i < count; i++)
-    {
-        theta->data[i] -= eta * grad->data[i];
-    }
+	if (!r_has_same_shape(theta, grad)) {
+		fprintf(stderr, "[ERROR]: r_optimization_sgd requires theta "
+				"and grad with matching shapes\n");
+		return;
+	}
+
+	count = R_MATRIX_SIZE(theta);
+	for (i = 0; i < count; i++)
+		theta->data[i] -= eta * grad->data[i];
 }
 
 /**
@@ -41,21 +38,25 @@ void r_optimization_sgd(RNONNULL RMatrix *theta, const RNONNULL RMatrix *grad, f
  * applies the momentum update to @theta.
  * Return: Nothing.
  */
-void r_optimization_sgdm(RNONNULL RMatrix *theta, const RNONNULL RMatrix *grad, RNONNULL RMatrix *velocity, float eta,
-                         float beta)
+void r_optimization_sgdm(RMatrix *theta, const RMatrix *grad, RMatrix *velocity,
+			 float eta, float beta)
 {
-    if (!has_same_shape(theta, grad) || !has_same_shape(theta, velocity))
-    {
-        printf("[ERROR]: r_optimization_sgdm requires theta, grad and velocity with matching shapes\n");
-        return;
-    }
+	size_t count;
+	size_t i;
 
-    const size_t count = MatrixSize(theta);
-    for (size_t i = 0; i < count; i++)
-    {
-        velocity->data[i] = beta * velocity->data[i] + (1.0f - beta) * grad->data[i];
-        theta->data[i] -= eta * velocity->data[i];
-    }
+	if (!r_has_same_shape(theta, grad) ||
+	    !r_has_same_shape(theta, velocity)) {
+		fprintf(stderr, "[ERROR]: r_optimization_sgdm requires theta, "
+				"grad and velocity with matching shapes\n");
+		return;
+	}
+
+	count = R_MATRIX_SIZE(theta);
+	for (i = 0; i < count; i++) {
+		velocity->data[i] =
+		    beta * velocity->data[i] + (1.0f - beta) * grad->data[i];
+		theta->data[i] -= eta * velocity->data[i];
+	}
 }
 
 /**
@@ -71,22 +72,25 @@ void r_optimization_sgdm(RNONNULL RMatrix *theta, const RNONNULL RMatrix *grad, 
  * parameter update by the RMS term.
  * Return: Nothing.
  */
-void r_optimization_rmsprop(RNONNULL RMatrix *theta, const RNONNULL RMatrix *grad, RNONNULL RMatrix *cache, float eta,
-                            float rho, float eps)
+void r_optimization_rmsprop(RMatrix *theta, const RMatrix *grad, RMatrix *cache,
+			    float eta, float rho, float eps)
 {
-    if (!has_same_shape(theta, grad) || !has_same_shape(theta, cache))
-    {
-        printf("[ERROR]: r_optimization_rmsprop requires theta, grad and cache with matching shapes\n");
-        return;
-    }
+	size_t count;
+	size_t i;
 
-    const size_t count = MatrixSize(theta);
-    for (size_t i = 0; i < count; i++)
-    {
-        float g = grad->data[i];
-        cache->data[i] = rho * cache->data[i] + (1.0f - rho) * (g * g);
-        theta->data[i] -= (eta / (sqrtf(cache->data[i]) + eps)) * g;
-    }
+	if (!r_has_same_shape(theta, grad) || !r_has_same_shape(theta, cache)) {
+		fprintf(stderr, "[ERROR]: r_optimization_rmsprop requires "
+				"theta, grad and cache with matching shapes\n");
+		return;
+	}
+
+	count = R_MATRIX_SIZE(theta);
+	for (i = 0; i < count; i++) {
+		float g = grad->data[i];
+
+		cache->data[i] = rho * cache->data[i] + (1.0f - rho) * (g * g);
+		theta->data[i] -= (eta / (sqrtf(cache->data[i]) + eps)) * g;
+	}
 }
 
 /**
@@ -105,31 +109,40 @@ void r_optimization_rmsprop(RNONNULL RMatrix *theta, const RNONNULL RMatrix *gra
  * updates @theta using the Adam rule.
  * Return: Nothing.
  */
-void r_optimization_adam(RNONNULL RMatrix *theta, const RNONNULL RMatrix *grad, RNONNULL RMatrix *m,
-                         RNONNULL RMatrix *v, float eta, float beta1, float beta2, float eps, size_t t)
+void r_optimization_adam(RMatrix *theta, const RMatrix *grad, RMatrix *m,
+			 RMatrix *v, float eta, float beta1, float beta2,
+			 float eps, size_t t)
 {
-    if (!has_same_shape(theta, grad) || !has_same_shape(theta, m) || !has_same_shape(theta, v))
-    {
-        printf("[ERROR]: r_optimization_adam requires theta, grad, m and v with matching shapes\n");
-        return;
-    }
+	float beta1_t;
+	float beta2_t;
+	size_t count;
+	size_t i;
 
-    if (t == 0) t = 1; // Prevent division by zero if initialized at t=0
+	if (!r_has_same_shape(theta, grad) || !r_has_same_shape(theta, m) ||
+	    !r_has_same_shape(theta, v)) {
+		fprintf(stderr, "[ERROR]: r_optimization_adam requires theta, "
+				"grad, m and v with matching shapes\n");
+		return;
+	}
 
-    float beta1_t = 1.0f - powf(beta1, (float)t);
-    float beta2_t = 1.0f - powf(beta2, (float)t);
+	if (t == 0)
+		t = 1;
 
-    const size_t count = MatrixSize(theta);
-    for (size_t i = 0; i < count; i++)
-    {
-        float g = grad->data[i];
+	beta1_t = 1.0f - powf(beta1, (float)t);
+	beta2_t = 1.0f - powf(beta2, (float)t);
 
-        m->data[i] = beta1 * m->data[i] + (1.0f - beta1) * g;
-        v->data[i] = beta2 * v->data[i] + (1.0f - beta2) * (g * g);
+	count = R_MATRIX_SIZE(theta);
+	for (i = 0; i < count; i++) {
+		float g = grad->data[i];
+		float m_hat;
+		float v_hat;
 
-        float m_hat = m->data[i] / beta1_t;
-        float v_hat = v->data[i] / beta2_t;
+		m->data[i] = beta1 * m->data[i] + (1.0f - beta1) * g;
+		v->data[i] = beta2 * v->data[i] + (1.0f - beta2) * (g * g);
 
-        theta->data[i] -= (eta / (sqrtf(v_hat) + eps)) * m_hat;
-    }
+		m_hat = m->data[i] / beta1_t;
+		v_hat = v->data[i] / beta2_t;
+
+		theta->data[i] -= (eta / (sqrtf(v_hat) + eps)) * m_hat;
+	}
 }

@@ -1,4 +1,5 @@
 #include <rc/r_tensor.h>
+#include <string.h>
 
 /**
  * r_create_tensor() - Allocate a tensor from a shape descriptor.
@@ -10,52 +11,57 @@
  * for the tensor data.
  * Return: Newly allocated tensor, or NULL on allocation failure.
  */
-RTensorND *r_create_tensor(size_t n_dim, const RNONNULL size_t *shape)
+RTensorND *r_create_tensor(size_t n_dim, const size_t *shape)
 {
-    RTensorND *tensor = malloc(sizeof(RTensorND));
-    if (tensor == NULL)
-        return NULL;
+	RTensorND *tensor;
+	size_t current_stride = 1;
+	size_t i;
+	size_t index;
 
-    tensor->n_dim = n_dim;
+	if (n_dim == 0 || !shape)
+		return NULL;
 
-    tensor->shape = malloc(sizeof(size_t) * n_dim);
-    tensor->stride = malloc(sizeof(size_t) * n_dim);
+	tensor = malloc(sizeof(*tensor));
+	if (!tensor)
+		return NULL;
 
-    if (tensor->shape == NULL || tensor->stride == NULL)
-    {
-        free(tensor->shape);
-        free(tensor->stride);
-        free(tensor);
-        return NULL;
-    }
+	tensor->n_dim = n_dim;
+	tensor->size = 1;
 
-    tensor->size = 1;
+	tensor->shape = malloc(sizeof(*tensor->shape) * n_dim);
+	if (!tensor->shape)
+		goto out_free_tensor;
 
-    for (size_t i = 0; i < n_dim; i++)
-    {
-        tensor->shape[i] = shape[i];
-        tensor->size *= shape[i];
-    }
+	tensor->stride = malloc(sizeof(*tensor->stride) * n_dim);
+	if (!tensor->stride)
+		goto out_free_shape;
 
-    size_t current_stride = 1;
-    for (size_t i = 0 - 1; i < n_dim; i++)
-    {
-        size_t index = n_dim - 1 - i;
-        tensor->stride[index] = current_stride;
-        current_stride *= tensor->shape[index];
-    }
+	for (i = 0; i < n_dim; i++) {
+		if (shape[i] == 0)
+			goto out_free_stride;
+		tensor->shape[i] = shape[i];
+		tensor->size *= shape[i];
+	}
 
-    tensor->data = malloc(sizeof(float) * tensor->size);
+	for (i = 0; i < n_dim; i++) {
+		index = n_dim - 1 - i;
+		tensor->stride[index] = current_stride;
+		current_stride *= tensor->shape[index];
+	}
 
-    if (tensor->data == NULL)
-    {
-        free(tensor->shape);
-        free(tensor->stride);
-        free(tensor);
-        return NULL;
-    }
+	tensor->data = malloc(sizeof(*tensor->data) * tensor->size);
+	if (!tensor->data)
+		goto out_free_stride;
 
-    return tensor;
+	return tensor;
+
+out_free_stride:
+	free(tensor->stride);
+out_free_shape:
+	free(tensor->shape);
+out_free_tensor:
+	free(tensor);
+	return NULL;
 }
 
 /**
@@ -69,58 +75,60 @@ RTensorND *r_create_tensor(size_t n_dim, const RNONNULL size_t *shape)
  * the tensor data, and copies the provided elements into the new buffer.
  * Return: Newly allocated tensor, or NULL on allocation failure.
  */
-RTensorND *r_create_tensor_from_data(size_t n_dim, const RNONNULL size_t *shape, RNONNULL float *data)
+RTensorND *r_create_tensor_from_data(size_t n_dim, const size_t *shape,
+				     float *data)
 {
-    RTensorND *tensor = malloc(sizeof(RTensorND));
-    if (tensor == NULL)
-        return NULL;
+	RTensorND *tensor;
+	size_t current_stride = 1;
+	size_t i;
+	size_t index;
 
-    tensor->n_dim = n_dim;
+	if (n_dim == 0 || !shape || !data)
+		return NULL;
 
-    tensor->shape = malloc(sizeof(size_t) * n_dim);
-    tensor->stride = malloc(sizeof(size_t) * n_dim);
+	tensor = malloc(sizeof(*tensor));
+	if (!tensor)
+		return NULL;
 
-    if (tensor->shape == NULL || tensor->stride == NULL)
-    {
-        free(tensor->shape);
-        free(tensor->stride);
-        free(tensor);
-        return NULL;
-    }
+	tensor->n_dim = n_dim;
+	tensor->size = 1;
 
-    tensor->size = 1;
+	tensor->shape = malloc(sizeof(*tensor->shape) * n_dim);
+	if (!tensor->shape)
+		goto out_free_tensor;
 
-    for (size_t i = 0; i < n_dim; i++)
-    {
-        tensor->shape[i] = shape[i];
-        tensor->size *= shape[i];
-    }
+	tensor->stride = malloc(sizeof(*tensor->stride) * n_dim);
+	if (!tensor->stride)
+		goto out_free_shape;
 
-    size_t current_stride = 1;
+	for (i = 0; i < n_dim; i++) {
+		if (shape[i] == 0)
+			goto out_free_stride;
+		tensor->shape[i] = shape[i];
+		tensor->size *= shape[i];
+	}
 
-    for (size_t i = 0; i < n_dim; i++)
-    {
-        size_t index = n_dim - 1 - i;
-        tensor->stride[index] = current_stride;
-        current_stride *= tensor->shape[index];
-    }
+	for (i = 0; i < n_dim; i++) {
+		index = n_dim - 1 - i;
+		tensor->stride[index] = current_stride;
+		current_stride *= tensor->shape[index];
+	}
 
-    tensor->data = malloc(sizeof(float) * tensor->size);
-    if (tensor->data == NULL)
-    {
-        free(tensor->shape);
-        free(tensor->stride);
-        free(tensor->data);
-        free(tensor);
-        return NULL;
-    }
+	tensor->data = malloc(sizeof(*tensor->data) * tensor->size);
+	if (!tensor->data)
+		goto out_free_stride;
 
-    for (size_t i = 0; i < tensor->size; i++)
-    {
-        tensor->data[i] = data[i];
-    }
+	memcpy(tensor->data, data, sizeof(*tensor->data) * tensor->size);
 
-    return tensor;
+	return tensor;
+
+out_free_stride:
+	free(tensor->stride);
+out_free_shape:
+	free(tensor->shape);
+out_free_tensor:
+	free(tensor);
+	return NULL;
 }
 
 /**
@@ -131,12 +139,15 @@ RTensorND *r_create_tensor_from_data(size_t n_dim, const RNONNULL size_t *shape,
  * object itself.
  * Return: Nothing.
  */
-void r_free_tensor(RNONNULL RTensorND *tensor)
+void r_free_tensor(RTensorND *tensor)
 {
-    tensor->size = 0;
-    tensor->n_dim = 0;
-    free(tensor->shape);
-    free(tensor->stride);
-    free(tensor->data);
-    free(tensor);
+	if (!tensor)
+		return;
+
+	tensor->size = 0;
+	tensor->n_dim = 0;
+	free(tensor->shape);
+	free(tensor->stride);
+	free(tensor->data);
+	free(tensor);
 }

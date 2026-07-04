@@ -12,22 +12,23 @@
  */
 RLayerDense *r_create_layer(size_t n_inputs, size_t n_neurons)
 {
-    RLayerDense *layer = malloc(sizeof(RLayerDense));
-    if (!layer)
-        return NULL;
+	RLayerDense *layer;
 
-    layer->biases = r_create_vector(n_neurons);
-    layer->weights = r_create_matrix(n_neurons, n_inputs);
+	layer = malloc(sizeof(*layer));
+	if (!layer)
+		return NULL;
 
-    if (!layer->biases || !layer->weights)
-    {
-        r_free_vector(layer->biases);
-        r_free_matrix(layer->weights);
-        free(layer);
-        return NULL;
-    }
+	layer->biases = r_create_vector(n_neurons);
+	layer->weights = r_create_matrix(n_neurons, n_inputs);
 
-    return layer;
+	if (!layer->biases || !layer->weights) {
+		r_free_vector(layer->biases);
+		r_free_matrix(layer->weights);
+		free(layer);
+		return NULL;
+	}
+
+	return layer;
 }
 
 /**
@@ -37,14 +38,14 @@ RLayerDense *r_create_layer(size_t n_inputs, size_t n_neurons)
  * Releases the weight matrix, bias vector, and the layer itself.
  * Return: Nothing.
  */
-void r_free_layer(RNONNULL RLayerDense *layer)
+void r_free_layer(RLayerDense *layer)
 {
-    if (!layer)
-        return;
+	if (!layer)
+		return;
 
-    r_free_matrix(layer->weights);
-    r_free_vector(layer->biases);
-    free(layer);
+	r_free_matrix(layer->weights);
+	r_free_vector(layer->biases);
+	free(layer);
 }
 
 /**
@@ -53,45 +54,51 @@ void r_free_layer(RNONNULL RLayerDense *layer)
  * @inputs: Input matrix where each row is a sample.
  *
  * Computes inputs * weights^T + biases efficiently without allocating
- * a transposed weight matrix.
+ * a transposed weight matrix. Uses an i-k-j loop order.
  * Return: Newly allocated matrix containing the layer output.
  */
-RMatrix *r_layer_forward(const RNONNULL RLayerDense *layer, const RNONNULL RMatrix *inputs)
+RMatrix *r_layer_forward(const RLayerDense *layer, const RMatrix *inputs)
 {
-    if (inputs->cols != layer->weights->cols)
-    {
-        printf("[ERROR]: r_layer_forward requires inputs->cols == layer->weights->cols\n");
-        return NULL;
-    }
-    if (layer->biases->size != layer->weights->rows)
-    {
-        printf("[ERROR]: r_layer_forward requires biases->size == number of neurons\n");
-        return NULL;
-    }
+	RMatrix *result;
+	size_t i;
+	size_t j;
+	size_t k;
 
-    RMatrix *result = r_create_matrix(inputs->rows, layer->weights->rows);
-    if (!result)
-        return NULL;
+	if (!layer || !inputs)
+		return NULL;
 
-    // Fused implicit transposition and matrix multiplication plus bias addition
-    // Computes: result[i][j] = sum_k(inputs[i][k] * weights[j][k]) + biases[j]
-    for (size_t i = 0; i < inputs->rows; i++)
-    {
-        const float *in_row = &inputs->data[i * inputs->cols];
-        float *out_row = &result->data[i * result->cols];
+	if (inputs->cols != layer->weights->cols) {
+		fprintf(stderr, "[ERROR]: r_layer_forward requires "
+				"inputs->cols == layer->weights->cols\n");
+		return NULL;
+	}
+	if (layer->biases->size != layer->weights->rows) {
+		fprintf(stderr, "[ERROR]: r_layer_forward requires "
+				"biases->size == number of neurons\n");
+		return NULL;
+	}
 
-        for (size_t j = 0; j < layer->weights->rows; j++)
-        {
-            const float *w_row = &layer->weights->data[j * layer->weights->cols];
-            float sum = layer->biases->data[j]; // Initialize with bias
-            
-            for (size_t k = 0; k < inputs->cols; k++)
-            {
-                sum += in_row[k] * w_row[k];
-            }
-            out_row[j] = sum;
-        }
-    }
+	result = r_create_matrix(inputs->rows, layer->weights->rows);
+	if (!result)
+		return NULL;
 
-    return result;
+	for (i = 0; i < inputs->rows; i++) {
+		const float *in_row = &inputs->data[i * inputs->cols];
+		float *out_row = &result->data[i * result->cols];
+
+		for (j = 0; j < layer->weights->rows; j++)
+			out_row[j] = layer->biases->data[j];
+
+		for (k = 0; k < inputs->cols; k++) {
+			float in_val = in_row[k];
+
+			for (j = 0; j < layer->weights->rows; j++)
+				out_row[j] +=
+				    in_val *
+				    layer->weights
+					->data[j * layer->weights->cols + k];
+		}
+	}
+
+	return result;
 }
